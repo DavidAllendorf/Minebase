@@ -1,0 +1,6 @@
+name: Minebase
+version: '0.1'
+main: de.xlb.minebase.Minebase
+api-version: '1.21'
+authors: [ xlbeastz ]
+description: Minecraft Database

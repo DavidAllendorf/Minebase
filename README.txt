@@ -1,56 +1,59 @@
-DEV:
-In plugin.yml add:
-    depend: [Minebase]
+Plugin that utilizes a SQLite Database.
+This README is for Developers!
 
-GRADLE:
-	dependencyResolutionManagement {
-		repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-		repositories {
-			mavenCentral()
-			maven { url 'https://jitpack.io' }
-		}
-	}
+DEPENDENCIES:
+    In plugin.yml add:
+        depend: [Minebase]
 
-	dependencies {
-    	        implementation 'com.github.DavidAllendorf:Minebase:alpha'
-    }
+    For Development, you need this external Dependencies:
+    "com.fasterxml.jackson.core:jackson-databind:2.17.0"
+    "org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT"
 
-MAVEN:
-    <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
-    <dependency>
-        <groupId>com.github.DavidAllendorf</groupId>
-        <artifactId>Minebase</artifactId>
-        <version>alpha</version>
-    </dependency>
+    GRADLE(xxxxx = Release Version):
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                mavenCentral()
+                maven { url 'https://jitpack.io' }
+            }
+        }
+
+        dependencies {
+                    implementation 'com.github.DavidAllendorf:Minebase:xxxxx'
+        }
+
+    MAVEN(xxxxx = Release Version):
+        <repositories>
+            <repository>
+                <id>jitpack.io</id>
+                <url>https://jitpack.io</url>
+            </repository>
+        </repositories>
+        <dependency>
+            <groupId>com.github.DavidAllendorf</groupId>
+            <artifactId>Minebase</artifactId>
+            <version>xxxxx</version>
+        </dependency>
 
 SCHEMA_EXAMPLE:
-{
-    "Player": {
-        "table": "player",
-        "columns":
-            {
-                name: uuid,
-                type: INTEGER
-            },
-            {
-                name: name,
-                type: TEXT
-            },
-            {
-                name: progress,
-                type: REAL
-            }
+    {
+      "abc": {
+        "table": "abc",
+        "columns": [
+          { "name": "uuid", "type": "INTEGER" },
+          { "name": "name", "type": "TEXT" },
+          { "name": "progress", "type": "REAL" }
+        ]
+      }
     }
-}
 
 EXAMPLE_CODE:
-    Minebase api = getServer().getPluginManager().getPlugin("Minebase").getApi();
-    api.loadSchema(); //Call on onCreate!
+    //Loading the Plugin
+    Plugin minebase = getServer().getPluginManager().getPlugin("Minebase");
+    MineDb api = ((Minebase) minebase).getApi();
+    api.loadSchema(); // The file is created when the plugin is started for the first time.
+                         Then stop the server and edit the JSON under Plugins.
+                         After editing, the server can be started again.
 
     //Insert Example
     InsertList insertData = new InsertList();
@@ -72,8 +75,8 @@ EXAMPLE_CODE:
     //Select Example
     ResultSet rs =  api.select("player", col("uuid","name"), cond("uuid = 1234123"), sort("name asc"));
     try {
-        while (rs.next()) { //Zeile
-            getLogger().info("Row: " + rs.getString("name")); //Spalte
+        while (rs.next()) { //Row
+            getLogger().info("Row: " + rs.getString("name")); //Column
         }
     } catch (Exception e) {
         throw new RuntimeException(e);

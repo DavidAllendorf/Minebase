@@ -30,8 +30,8 @@ public final class Minebase extends JavaPlugin implements Listener {
 
     /**
      * Interface to get Database Class
-     * Example: xDatabase db = getServer().getPluginManager().getPlugin("Minebase").getApi();
-     * @return xDatabase
+     * Example: MineDb db = getServer().getPluginManager().getPlugin("Minebase").getApi();
+     * @return MineDb
      */
     public MineDb getApi() {
         return api;

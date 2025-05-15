@@ -12,7 +12,7 @@ GRADLE:
 	}
 
 	dependencies {
-    	        implementation 'com.github.DavidAllendorf:Minebase:Tag'
+    	        implementation 'com.github.DavidAllendorf:Minebase:alpha'
     }
 
 MAVEN:
@@ -25,7 +25,7 @@ MAVEN:
     <dependency>
         <groupId>com.github.DavidAllendorf</groupId>
         <artifactId>Minebase</artifactId>
-        <version>Tag</version>
+        <version>alpha</version>
     </dependency>
 
 SCHEMA_EXAMPLE:

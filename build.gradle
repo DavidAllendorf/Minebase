@@ -9,18 +9,18 @@ version = '0.1'
 repositories {
     mavenCentral()
     maven {
-        name = "papermc-repo"
-        url = "https://repo.papermc.io/repository/maven-public/"
-    }
-    maven {
         name = "sonatype"
         url = "https://oss.sonatype.org/content/groups/public/"
+    }
+    maven {
+        name = "spigot-repo"
+        url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
     }
 }
 
 dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
-    implementation("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    implementation("org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT")
 }
 
 tasks {

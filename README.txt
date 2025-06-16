@@ -1,4 +1,4 @@
-Simple Database Schema-like Tool.
+Simple Database Schema-like Tool for Minecraft Plugin Servers.
 Documentation : https://github.com/DavidAllendorf/Minebase/wiki
 
 TODO:

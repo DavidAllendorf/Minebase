@@ -23,6 +23,17 @@ public class MineDb {
     private final Logger log;
     private Map<String, Map<String, Object>> schema;
 
+    //LogColors
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_BLACK = "\u001B[30m";
+    public static final String ANSI_RED = "\u001B[31m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_YELLOW = "\u001B[33m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_CYAN = "\u001B[36m";
+    public static final String ANSI_WHITE = "\u001B[37m";
+
     /**
      * Creates DB Instance
      * @param log
@@ -294,7 +305,7 @@ public class MineDb {
     //##################################################################################################################
 
     /**
-     *
+     * Doesn't create Table when Table exists, even if Tableschema is different
      * @param conf
      */
     public void createTable(TableConfig conf){
@@ -305,8 +316,6 @@ public class MineDb {
 
         List<Map<String, String>> columns = conf.getTableColumns();
         String[] primaryKeys = conf.getPrimaryKeys();
-        log.info(tableName);
-        log.info(Arrays.toString(primaryKeys));
 
         for (int i = 0; i < columns.size(); i++) {
             Map<String, String> col = columns.get(i);
@@ -325,11 +334,10 @@ public class MineDb {
 
         sql.append(");");
 
-        log.info(sql.toString());
 
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql.toString());
-            log.info("Created Table: "+tableName);
+            log.info(ANSI_GREEN + "Created/Checked Table: "+tableName + ANSI_RESET);
         }catch (SQLException e){
             log.severe("Error creating Table: " + e.getMessage());
         }
@@ -340,108 +348,55 @@ public class MineDb {
 
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
-            log.info("Deleted Table: " + tableName);
+            log.info(ANSI_RED + "Deleted Table: " + tableName + ANSI_RESET);
         } catch (SQLException e) {
             log.severe("Error deleting Table: " + e.getMessage());
         }
     }
 
     /**
-     * Migrate Table Call after createTable.
-     * @param conf
+     * Migrates an existing table to match the given schema.
+     * If differences are detected (columns or primary keys), the table is rebuilt and data migrated.
+     *
+     * @param conf Configuration for the table schema.
      */
     public void migrateTable(TableConfig conf) {
         String tableName = conf.getTableName();
         List<Map<String, String>> newColumns = conf.getTableColumns();
+        Set<String> newPrimaryKeys = new HashSet<>(Arrays.asList(Optional.ofNullable(conf.getPrimaryKeys()).orElse(new String[0])));
 
-        Set<String> existingColumnNames = new HashSet<>();
+        try {
+            log.info(ANSI_PURPLE + "Start Migration" + ANSI_RESET);
+            Map<String, String> existingColumns = getExistingColumns(tableName);
+            Set<String> existingPrimaryKeys = getExistingPrimaryKeys(tableName);
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + tableName + ")")) {
-
-            while (rs.next()) {
-                existingColumnNames.add(rs.getString("name"));
+            if (schemasMatch(existingColumns, existingPrimaryKeys, newColumns, newPrimaryKeys)) {
+                log.info(ANSI_PURPLE + "Table '" + tableName + "' has no schema changes. Skipping migration." + ANSI_RESET);
+                return;
             }
 
-            // Gemeinsame Spalten bestimmen
-            List<String> commonColumns = new ArrayList<>();
-            for (Map<String, String> col : newColumns) {
-                String name = col.get("name");
-                if (existingColumnNames.contains(name)) {
-                    commonColumns.add(name);
-                }
-            }
+            List<String> commonColumns = newColumns.stream()
+                    .map(col -> col.get("name"))
+                    .filter(existingColumns::containsKey)
+                    .toList();
 
-            String tmpTableName = "tmp_backup_" + tableName + "_" + System.currentTimeMillis();
+            String backupTable = "tmp_backup_" + tableName + "_" + System.currentTimeMillis();
 
-            // Backup-Daten vor DROP sichern
             if (!commonColumns.isEmpty()) {
-                try (Statement tmpCreate = connection.createStatement()) {
-                    tmpCreate.execute("CREATE TEMP TABLE " + tmpTableName + " AS SELECT " +
-                            String.join(", ", commonColumns) + " FROM " + tableName + ";");
-                    log.info("Backup-Tabelle '" + tmpTableName + "' mit alten Daten erstellt.");
-                } catch (SQLException e) {
-                    log.warning("Kein Backup möglich: " + e.getMessage());
-                }
+                createBackupTable(tableName, backupTable, commonColumns);
             }
 
-            // Alte Tabelle löschen
-            try (Statement dropStmt = connection.createStatement()) {
-                dropStmt.execute("DROP TABLE IF EXISTS " + tableName);
-                log.info("Alte Tabelle '" + tableName + "' gelöscht.");
-            }
+            deleteTable(tableName);
+            createTable(conf);
 
-            // Neue Tabelle erstellen
-            StringBuilder createSql = new StringBuilder("CREATE TABLE " + tableName + " (");
-            for (int i = 0; i < newColumns.size(); i++) {
-                Map<String, String> col = newColumns.get(i);
-                createSql.append(col.get("name")).append(" ").append(col.get("type"));
-                if (i < newColumns.size() - 1) {
-                    createSql.append(", ");
-                }
-            }
-
-            String[] primaryKeys = conf.getPrimaryKeys();
-            if (primaryKeys != null && primaryKeys.length > 0) {
-                createSql.append(", PRIMARY KEY (").append(String.join(", ", primaryKeys)).append(")");
-            }
-            createSql.append(");");
-
-            try (Statement createStmt = connection.createStatement()) {
-                createStmt.execute(createSql.toString());
-                log.info("Neue Tabelle '" + tableName + "' erstellt.");
-            } catch (SQLException createEx) {
-                log.severe("Fehler beim Erstellen der neuen Tabelle: " + createEx.getMessage());
-                // Versuch alte Tabelle aus Backup wiederherzustellen
-                if (!commonColumns.isEmpty()) {
-                    try (Statement restoreOldStmt = connection.createStatement()) {
-                        String restoreSql = "CREATE TABLE " + tableName + " AS SELECT * FROM " + tmpTableName + ";";
-                        restoreOldStmt.execute(restoreSql);
-                        log.info("Alte Tabelle '" + tableName + "' aus Backup wiederhergestellt.");
-                    } catch (SQLException restoreEx) {
-                        log.severe("Fehler bei Wiederherstellung der alten Tabelle: " + restoreEx.getMessage());
-                    }
-                }
-                return; // Migration abbrechen
-            }
-
-            // Daten aus Backup in neue Tabelle kopieren
             if (!commonColumns.isEmpty()) {
-                try (Statement restoreStmt = connection.createStatement()) {
-                    String insertSql = "INSERT INTO " + tableName + " (" +
-                            String.join(", ", commonColumns) + ") SELECT " +
-                            String.join(", ", commonColumns) + " FROM " + tmpTableName + ";";
-                    restoreStmt.execute(insertSql);
-                    log.info("Daten aus Backup wiederhergestellt.");
-                } catch (SQLException e) {
-                    log.warning("Fehler beim Wiederherstellen der Daten: " + e.getMessage());
-                }
+                restoreDataFromBackup(tableName, backupTable, commonColumns);
             }
 
-            log.info("Tabelle '" + tableName + "' erfolgreich vollständig neu erstellt.");
+            log.info(ANSI_PURPLE + "Table '" + tableName + "' successfully migrated." + ANSI_RESET);
 
         } catch (SQLException e) {
-            log.severe("Fehler bei Migration der Tabelle '" + tableName + "': " + e.getMessage());
+            log.severe("Migration failed for table '" + tableName + "': " + e.getMessage());
         }
     }
 
@@ -511,6 +466,101 @@ public class MineDb {
         }
     }
 
+    //##################################################################################################################
+    //###########################################Utils##################################################################
+    //##################################################################################################################
+
+    /**
+     * Get all Columns from a Table(live Database)
+     * @param tableName
+     * @return
+     * @throws SQLException
+     */
+    private Map<String, String> getExistingColumns(String tableName) throws SQLException {
+        Map<String, String> columns = new LinkedHashMap<>();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + tableName + ")")) {
+            while (rs.next()) {
+                columns.put(rs.getString("name"), rs.getString("type").toUpperCase());
+            }
+        }
+        return columns;
+    }
+
+    /**
+     * Get all PK froms a Table(live Database)
+     * @param tableName
+     * @return
+     * @throws SQLException
+     */
+    private Set<String> getExistingPrimaryKeys(String tableName) throws SQLException {
+        Set<String> primaryKeys = new LinkedHashSet<>();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + tableName + ")")) {
+            while (rs.next()) {
+                if (rs.getInt("pk") > 0) {
+                    primaryKeys.add(rs.getString("name"));
+                }
+            }
+        }
+        return primaryKeys;
+    }
+
+    /**
+     * Checks if Schema = DbTable
+     * @param existingCols
+     * @param existingPKs
+     * @param newCols
+     * @param newPKs
+     * @return
+     */
+    private boolean schemasMatch(Map<String, String> existingCols, Set<String> existingPKs,
+                                 List<Map<String, String>> newCols, Set<String> newPKs) {
+        if (existingCols.size() != newCols.size()) return false;
+
+        for (Map<String, String> col : newCols) {
+            String name = col.get("name");
+            String type = col.get("type").toUpperCase();
+            if (!type.equals(existingCols.getOrDefault(name, ""))) return false;
+        }
+
+        return existingPKs.equals(newPKs);
+    }
+
+    /**
+     * Creates Backup Table
+     * @param tableName
+     * @param backupName
+     * @param columns
+     */
+    private void createBackupTable(String tableName, String backupName, List<String> columns) {
+        String columnList = String.join(", ", columns);
+        String sql = "CREATE TEMP TABLE " + backupName + " AS SELECT " + columnList + " FROM " + tableName;
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+            log.info("Backup table '" + backupName + "' created.");
+        } catch (SQLException e) {
+            log.warning("Backup creation failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Insertet Data from backupName to tableName
+     * @param tableName
+     * @param backupName
+     * @param columns
+     */
+    private void restoreDataFromBackup(String tableName, String backupName, List<String> columns) {
+        String columnList = String.join(", ", columns);
+        String sql = "INSERT INTO " + tableName + " (" + columnList + ") SELECT " + columnList + " FROM " + backupName;
+
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+            log.info("Data restored to new table from backup.");
+        } catch (SQLException e) {
+            log.warning("Failed to restore data: " + e.getMessage());
+        }
+    }
     //##################################################################################################################
     //###########################################Addition-Interfaces####################################################
     //##################################################################################################################

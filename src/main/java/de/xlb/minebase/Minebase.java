@@ -1,12 +1,13 @@
 package de.xlb.minebase;
 
-import de.xlb.minebase.api.MineDb;
 import de.xlb.minebase.utils.Test;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.sql.SQLException;
 
+/**
+ * Provides Database Classes
+ */
 public final class Minebase extends JavaPlugin implements Listener {
 
     @Override

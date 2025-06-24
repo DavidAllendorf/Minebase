@@ -36,6 +36,7 @@ public class Test {
         run(insert(), "insert");
         run(update(), "update");
         run(select(), "select");
+        run(selectSum(), "selectSum");
         run(delete(), "delete");
 
         deleteTestSchema();
@@ -142,6 +143,16 @@ public class Test {
             }
 
             return rs.getColumn(1, "progress").equalsIgnoreCase("40.0");
+        }catch (Exception e){
+            log.severe(e.toString());
+            return false;
+        }
+    }
+
+    public Boolean selectSum(){
+        try{
+            ReturnSet rs =  api.select(TEST_TABLE, col("sum(progress) as sum_progress"));
+            return rs.getColumn(0, "sum_progress").equalsIgnoreCase("100.3");
         }catch (Exception e){
             log.severe(e.toString());
             return false;

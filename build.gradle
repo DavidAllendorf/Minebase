@@ -31,6 +31,12 @@ jar {
 
 shadowJar {
     archiveClassifier.set("")
+    mergeServiceFiles()
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/LICENSE*'
+    exclude 'META-INF/NOTICE*'
 }
 
 publishing {
